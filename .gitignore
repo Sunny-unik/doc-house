@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# assignment brief & planning docs — never commit
+/details.txt
+
+# keep the example env even though .env* is ignored above
+!.env.example
