@@ -5,6 +5,7 @@ import { z } from "zod";
 // Keys are added here as each checkpoint starts needing them.
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required (Neon connection string)"),
+  AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required (generate with: npx auth secret)"),
 });
 
 const parsed = envSchema.safeParse(process.env);
