@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
+import { DeleteDocumentButton } from "@/components/documents/DeleteDocumentButton";
+import { DocumentTitle } from "@/components/documents/DocumentTitle";
 import { DocumentEditor } from "@/components/editor/DocumentEditor";
 import { getDocumentForUser } from "@/db/dal/documents";
 
@@ -18,9 +20,14 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         ← All documents
       </Link>
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        {doc.title}
-      </h1>
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <DocumentTitle
+          documentId={doc.id}
+          initialTitle={doc.title}
+          editable={doc.role !== "viewer"}
+        />
+        {doc.role === "owner" ? <DeleteDocumentButton documentId={doc.id} /> : null}
+      </div>
       <p className="mt-1 text-sm text-zinc-500">Your role: {doc.role}</p>
 
       <DocumentEditor documentId={doc.id} editable={doc.role !== "viewer"} />
