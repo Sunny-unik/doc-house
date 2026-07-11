@@ -14,7 +14,7 @@ import {
 // produces/consumes) and let the driver hand us a Buffer at the boundary.
 // NOTE(CP6): confirm the Neon driver actually returns a Buffer here before
 // building the sync round-trip on top of it.
-const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+const bytea = customType<{ data: Uint8Array; driverData: Buffer | string }>({
   dataType() {
     return "bytea";
   },
@@ -22,11 +22,18 @@ const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
     return Buffer.from(value);
   },
   fromDriver(value) {
+    // We override Neon's bytea parser (see db/index.ts), so reads arrive as a
+    // hex string like "\\x0102". Fall back to Buffer for other drivers/tests.
+    if (typeof value === "string") {
+      const hex = value.startsWith("\\x") ? value.slice(2) : value;
+      return Uint8Array.from(Buffer.from(hex, "hex"));
+    }
     return new Uint8Array(value);
   },
 });
 
 export const docRole = pgEnum("DocRole", ["owner", "editor", "viewer"]);
+export type DocRole = (typeof docRole.enumValues)[number];
 
 export const users = pgTable("User", {
   id: uuid("id").primaryKey().defaultRandom(),

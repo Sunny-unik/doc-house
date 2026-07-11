@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documentMemberships, documents } from "@/db/schema";
 
@@ -20,6 +20,16 @@ export async function listDocumentsForUser(userId: string) {
     .orderBy(desc(documents.updatedAt));
 }
 
+// Lightweight role lookup for API authorization — just the caller's role, or null.
+export async function getMembershipRole(documentId: string, userId: string) {
+  const [row] = await db
+    .select({ role: documentMemberships.role })
+    .from(documentMemberships)
+    .where(and(eq(documentMemberships.documentId, documentId), eq(documentMemberships.userId, userId)))
+    .limit(1);
+  return row?.role ?? null;
+}
+
 // Returns the document + the caller's role, or null if they aren't a member.
 export async function getDocumentForUser(documentId: string, userId: string) {
   const [row] = await db
@@ -37,6 +47,18 @@ export async function getDocumentForUser(documentId: string, userId: string) {
     .limit(1);
 
   return row ?? null;
+}
+
+export async function renameDocument(documentId: string, title: string) {
+  await db
+    .update(documents)
+    .set({ title: title.trim() || "Untitled", updatedAt: sql`now()` })
+    .where(eq(documents.id, documentId));
+}
+
+// FK cascades remove memberships, updates, and snapshots with the document.
+export async function deleteDocument(documentId: string) {
+  await db.delete(documents).where(eq(documents.id, documentId));
 }
 
 // Create a document and its owner membership atomically. We pre-generate the id
