@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { OutboxFlusher } from "@/components/offline/OutboxFlusher";
 import { logout } from "@/lib/auth-actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       {children}
+      <OutboxFlusher />
     </div>
   );
 }

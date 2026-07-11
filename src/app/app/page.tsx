@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { DocumentList } from "@/components/documents/DocumentList";
+import { NewDocumentButton } from "@/components/documents/NewDocumentButton";
 import { DOCS_PAGE_SIZE, listDocumentsForUser } from "@/db/dal/documents";
-import { createDocument } from "@/lib/document-actions";
 
 export default async function AppPage() {
   const session = await auth();
@@ -23,14 +23,7 @@ export default async function AppPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           Documents
         </h1>
-        <form action={createDocument}>
-          <button
-            type="submit"
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            New document
-          </button>
-        </form>
+        <NewDocumentButton />
       </div>
 
       <DocumentList initialDocs={initialDocs} initialHasMore={hasMore} />

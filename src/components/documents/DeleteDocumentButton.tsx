@@ -1,14 +1,19 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { deleteDocument } from "@/lib/document-actions";
+import { deleteDocumentOffline } from "@/lib/offline/mutations";
 
 export function DeleteDocumentButton({ documentId }: { documentId: string }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function onDelete() {
     if (!window.confirm("Delete this document? This can’t be undone.")) return;
-    startTransition(() => deleteDocument(documentId));
+    startTransition(async () => {
+      await deleteDocumentOffline(documentId);
+      if (navigator.onLine) router.push("/app");
+    });
   }
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { renameDocument } from "@/lib/document-actions";
+import { renameDocumentOffline } from "@/lib/offline/mutations";
 
 export function DocumentTitle({
   documentId,
@@ -27,7 +27,7 @@ export function DocumentTitle({
     const next = title.trim() || "Untitled";
     setTitle(next);
     if (next === initialTitle) return;
-    startTransition(() => renameDocument(documentId, next));
+    startTransition(() => renameDocumentOffline(documentId, next));
   }
 
   return (
