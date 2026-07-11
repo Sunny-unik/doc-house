@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
+import { DocumentEditor } from "@/components/editor/DocumentEditor";
 import { getDocumentForUser } from "@/db/dal/documents";
 
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,9 +23,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       </h1>
       <p className="mt-1 text-sm text-zinc-500">Your role: {doc.role}</p>
 
-      <div className="mt-10 rounded-lg border border-dashed border-zinc-300 p-10 text-center text-sm text-zinc-500 dark:border-zinc-700">
-        The editor lands here in the next checkpoint.
-      </div>
+      <DocumentEditor documentId={doc.id} editable={doc.role !== "viewer"} />
     </main>
   );
 }
