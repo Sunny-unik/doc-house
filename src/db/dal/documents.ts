@@ -6,8 +6,15 @@ import { documentMemberships, documents } from "@/db/schema";
 // Every read goes through a membership join, so a user can only ever see
 // documents they belong to — tenant isolation is enforced here, not in routes.
 
-export async function listDocumentsForUser(userId: string) {
-  return db
+export const DOCS_PAGE_SIZE = 5;
+
+// Paginated list. We fetch one extra row to know if there's a next page without
+// a separate count query, then trim it off.
+export async function listDocumentsForUser(
+  userId: string,
+  { limit = DOCS_PAGE_SIZE, offset = 0 }: { limit?: number; offset?: number } = {},
+) {
+  const rows = await db
     .select({
       id: documents.id,
       title: documents.title,
@@ -17,7 +24,12 @@ export async function listDocumentsForUser(userId: string) {
     .from(documents)
     .innerJoin(documentMemberships, eq(documentMemberships.documentId, documents.id))
     .where(eq(documentMemberships.userId, userId))
-    .orderBy(desc(documents.updatedAt));
+    .orderBy(desc(documents.updatedAt))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = rows.length > limit;
+  return { docs: hasMore ? rows.slice(0, limit) : rows, hasMore };
 }
 
 // Lightweight role lookup for API authorization — just the caller's role, or null.
