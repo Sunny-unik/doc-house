@@ -3,6 +3,7 @@
 import Collaboration from "@tiptap/extension-collaboration";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel";
 import { YJS_FRAGMENT } from "@/lib/collab";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { Toolbar } from "./Toolbar";
@@ -36,6 +37,13 @@ export function Editor({ documentId, editable }: { documentId: string; editable:
         {editable ? <ConnectionStatus status={status} /> : null}
         <span>{loaded ? "Saved locally" : "Loading…"}</span>
       </div>
+
+      <VersionHistoryPanel
+        documentId={documentId}
+        ydoc={ydoc}
+        editor={editor}
+        canEdit={editable}
+      />
     </div>
   );
 }
