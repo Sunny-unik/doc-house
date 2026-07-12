@@ -23,10 +23,32 @@ export function DocumentList({
   const [loading, setLoading] = useState(false);
   const [cached, setCached] = useState(false);
 
-  // Keep the local cache warm with whatever the server last rendered.
+  // Keep the metadata cache warm with whatever the list is currently showing.
+  // Uses `docs` (not `initialDocs`) so pagination results are cached too.
   useEffect(() => {
-    void cacheDocs(initialDocs);
-  }, [initialDocs]);
+    if (cached) return; // already came from cache, don't loop it back in
+    if (docs.length === 0) return;
+    void cacheDocs(docs);
+  }, [docs, cached]);
+
+  // Warm each doc's Yjs store in the background so any listed doc opens
+  // instantly and works offline. Also runs on pagination, so every doc the
+  // user has ever seen in the list ends up mirrored into IndexedDB.
+  useEffect(() => {
+    if (cached) return;
+    if (docs.length === 0) return;
+    if (typeof navigator === "undefined" || !navigator.onLine) return;
+
+    const controller = new AbortController();
+    (async () => {
+      const { prefetchDocuments } = await import("@/lib/offline/prefetch");
+      await prefetchDocuments(
+        docs.map((d) => d.id),
+        controller.signal,
+      );
+    })();
+    return () => controller.abort();
+  }, [docs, cached]);
 
   async function loadPage(nextPage: number) {
     setLoading(true);
@@ -38,7 +60,6 @@ export function DocumentList({
       setHasMore(data.hasMore);
       setPage(nextPage);
       setCached(false);
-      void cacheDocs(data.docs);
     } catch {
       // Offline / fetch failed: fall back to everything cached locally.
       setDocs(await getCachedDocs());
