@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import {
   createDocument,
@@ -17,9 +18,18 @@ async function requireUserId() {
   return session.user.id;
 }
 
+// Invalidate the App-Router RSC cache for /app (list) and /app/[id] (doc page)
+// so a back-navigation after a mutation shows the fresh title / list, not the
+// stale prefetched payload.
+function invalidateDocSurfaces(documentId: string) {
+  revalidatePath("/app");
+  revalidatePath(`/app/${documentId}`);
+}
+
 export async function pushCreate(id: string, title: string) {
   const userId = await requireUserId();
   await createDocument({ id, ownerId: userId, title });
+  invalidateDocSurfaces(id);
 }
 
 export async function pushRename(id: string, title: string) {
@@ -27,6 +37,7 @@ export async function pushRename(id: string, title: string) {
   const access = await requireDocRole(id, userId, ["owner", "editor"]);
   if (!access.ok) throw new Error("Not allowed to rename this document");
   await renameDocument(id, title);
+  invalidateDocSurfaces(id);
 }
 
 export async function pushDelete(id: string) {
@@ -34,4 +45,5 @@ export async function pushDelete(id: string) {
   const access = await requireDocRole(id, userId, ["owner"]);
   if (!access.ok) throw new Error("Only the owner can delete this document");
   await deleteDocument(id);
+  invalidateDocSurfaces(id);
 }
