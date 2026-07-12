@@ -5,6 +5,8 @@ import {
   removeDocumentMember,
   updateMemberRole,
 } from "@/db/dal/documents";
+import { parseJsonBody } from "@/lib/security/payload";
+import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 
 // PATCH — owner only; change a member's role between editor and viewer.
 // DELETE — owner can remove anyone (except themselves), or a member can remove
@@ -12,6 +14,8 @@ import {
 // silently orphaned.
 
 const roleSchema = z.object({ role: z.enum(["editor", "viewer"]) });
+const MAX_MEMBER_BYTES = 1_000;
+const MEMBER_WRITE_RATE = { limit: 30, windowMs: 60_000 } as const;
 
 export async function PATCH(
   req: Request,
@@ -22,6 +26,9 @@ export async function PATCH(
   if (!session?.user?.id) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = rateLimit(`members:${session.user.id}`, MEMBER_WRITE_RATE);
+  if (!rl.ok) return tooManyRequestsResponse(rl);
 
   const callerRole = await getMembershipRole(id, session.user.id);
   if (callerRole !== "owner") {
@@ -36,14 +43,12 @@ export async function PATCH(
     return Response.json({ error: "Cannot change the owner's role" }, { status: 409 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = await parseJsonBody(req, { maxBytes: MAX_MEMBER_BYTES });
+  if (!body.ok) {
+    return Response.json({ error: body.error }, { status: body.status });
   }
 
-  const parsed = roleSchema.safeParse(body);
+  const parsed = roleSchema.safeParse(body.data);
   if (!parsed.success) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -61,6 +66,9 @@ export async function DELETE(
   if (!session?.user?.id) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = rateLimit(`members:${session.user.id}`, MEMBER_WRITE_RATE);
+  if (!rl.ok) return tooManyRequestsResponse(rl);
 
   const callerRole = await getMembershipRole(id, session.user.id);
   if (!callerRole) {
