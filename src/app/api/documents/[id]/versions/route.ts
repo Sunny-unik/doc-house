@@ -9,13 +9,25 @@ import { base64ToBytes } from "@/lib/sync/codec";
 // GET /api/documents/[id]/versions   — any member lists past versions.
 // POST /api/documents/[id]/versions  — owners/editors capture a new snapshot.
 
-// A snapshot is a full Yjs state, so the ceiling matches the sync route.
+// Body-size cap for saving a version.
+// - A snapshot is the full Yjs state at that moment, so the ceiling is
+//   deliberately the same 4 MB envelope the sync route uses. Anything
+//   snapshottable syncs; anything unsyncable can't be snapshotted.
 const MAX_SNAPSHOT_BYTES = 4_000_000;
+
+// Per-user snapshot rate limit.
+// - Snapshots are an intentional user action (Save version), so 30/min is
+//   an order of magnitude more than any human would ever click.
+// - Bucket key `snap:<userId>` is separate from the sync bucket so heavy
+//   collaborative editing doesn't lock a user out of saving a version.
 const SNAPSHOT_RATE = { limit: 30, windowMs: 60_000 } as const;
 
 const createSchema = z.object({
+  // Labels are single-line and human-typed; 200 chars covers any reasonable
+  // description without letting the DB row grow unbounded.
   label: z.string().trim().min(1).max(200),
-  // Base64 headroom: raw cap × 4/3 with a little slack.
+  // Base64 field cap = raw MAX_SNAPSHOT_BYTES × 4/3 (base64 overhead) plus a
+  // little slack, so a maximally-sized binary snapshot still fits.
   snapshot: z.string().max(6_000_000),
 });
 

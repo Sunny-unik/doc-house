@@ -13,13 +13,20 @@ import { bytesEqual, materializeDoc } from "@/lib/sync/yjs-server";
 //  1. append the client's genuinely-new content to the append-only log
 //  2. return the update the client is missing (via its state vector)
 
-// A Yjs update that legitimately reaches ~1 MB binary would already be an
-// extreme outlier; 1.5 MB base64 ≈ 1.1 MB binary is a comfortable ceiling.
-// Envelope headroom is added on top so a JSON wrapper never trips us up.
+// Body-size cap on the request envelope (JSON wrapper + both base64 fields).
+// - 4 MB is 2x the sum of the two 1.5 MB base64 caps in SyncRequestSchema,
+//   giving comfortable headroom for JSON braces, key names, and future fields.
+// - Enforced by parseJsonBody as a bounded stream, so a client that lies about
+//   Content-Length or streams chunked can't force us to buffer past 4 MB into
+//   memory — we abort mid-stream and return 413.
 const MAX_SYNC_BYTES = 4_000_000;
 
-// Aggressive local typing debounces to ~1 sync/sec. 120/min per user leaves a
-// 2x safety factor before a real collaborator gets hit.
+// Per-user sync rate limit.
+// - The editor debounces bursts of typing to about 1 sync per second.
+// - 120 requests per 60-second sliding window leaves ~2x headroom over that
+//   organic ceiling before a legitimately fast collaborator is throttled.
+// - Bucket key is `sync:<userId>` — one bucket per user, shared across all
+//   documents they're editing (rare edge case; keeps the store small).
 const SYNC_RATE = { limit: 120, windowMs: 60_000 } as const;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

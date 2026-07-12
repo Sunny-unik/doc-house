@@ -5,6 +5,12 @@ import { isAiConfigured, suggestDocumentTitle } from "@/lib/ai/gemini";
 import { parseJsonBody } from "@/lib/security/payload";
 import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 
+// Limits match the summarize route so a caller can't sidestep one endpoint's
+// ceilings by hitting the other:
+// - MAX_INPUT_CHARS: 100_000 chars of prose (≈25_000 tokens) — Zod-enforced.
+// - MAX_BYTES: 200 KB envelope, catching bloated JSON before it's buffered.
+// - AI_RATE: 20 req/min per user in the shared `ai:<userId>` bucket, so
+//   total AI spend per user is bounded across both endpoints combined.
 const MAX_INPUT_CHARS = 100_000;
 const MAX_BYTES = 200_000;
 const AI_RATE = { limit: 20, windowMs: 60_000 } as const;
@@ -40,7 +46,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const title = await suggestDocumentTitle(parsed.data.content);
     return Response.json({ title });
-  } catch {
+  } catch (err) {
+    console.error("AI request failed:", err);
     return Response.json({ error: "AI request failed. Please try again." }, { status: 502 });
   }
 }

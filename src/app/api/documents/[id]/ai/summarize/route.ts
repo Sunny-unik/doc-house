@@ -5,10 +5,23 @@ import { isAiConfigured, summarizeDocument } from "@/lib/ai/gemini";
 import { parseJsonBody } from "@/lib/security/payload";
 import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 
-// 100 KB of prose is more than an average human document; anything larger is
-// almost certainly a paste-bomb we don't want to spend AI budget on.
+// Character cap on the document text sent to Gemini.
+// - 100_000 chars ≈ 25_000 tokens, which is well within any Gemini context
+//   window and covers a very long human document.
+// - Enforced by Zod so oversized content is rejected before we spend an AI
+//   call on it. Keeps token spend predictable.
 const MAX_INPUT_CHARS = 100_000;
+
+// Body-size cap on the request envelope. 200 KB comfortably wraps a
+// 100 KB-char payload plus JSON overhead.
 const MAX_BYTES = 200_000;
+
+// Per-user AI rate limit.
+// - 20 requests per 60-second sliding window balances a good demo experience
+//   with a hard ceiling on Gemini spend if an account gets scripted.
+// - Bucket key `ai:<userId>` is shared across both AI endpoints (summarize
+//   and suggest-title) so total AI cost per user is bounded regardless of
+//   which action they favour.
 const AI_RATE = { limit: 20, windowMs: 60_000 } as const;
 
 const schema = z.object({

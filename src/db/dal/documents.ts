@@ -5,6 +5,9 @@ import { type DocRole, documentMemberships, documents, users } from "@/db/schema
 // Every read goes through a membership join, so a user can only ever see
 // documents they belong to — tenant isolation is enforced here, not in routes.
 
+// Documents shown per page in the app list. Kept small so the initial `/app`
+// server render is cheap even for prolific users and so the background Yjs
+// prefetch on the client finishes in a couple of seconds per page turn.
 export const DOCS_PAGE_SIZE = 5;
 
 // Paginated list. We fetch one extra row to know if there's a next page without

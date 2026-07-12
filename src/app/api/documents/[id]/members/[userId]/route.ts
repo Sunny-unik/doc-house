@@ -14,7 +14,14 @@ import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 // silently orphaned.
 
 const roleSchema = z.object({ role: z.enum(["editor", "viewer"]) });
+
+// Body-size cap for a role change — just `{ role }`, so 1 KB is already 20x
+// what a valid payload needs.
 const MAX_MEMBER_BYTES = 1_000;
+
+// Same 30/min sliding window as the invite endpoint, and same bucket key
+// (`members:<userId>`), so PATCH + DELETE + POST share a single ceiling per
+// user. Prevents a script from cycling role changes to bypass the invite cap.
 const MEMBER_WRITE_RATE = { limit: 30, windowMs: 60_000 } as const;
 
 export async function PATCH(

@@ -17,9 +17,18 @@ const inviteSchema = z.object({
   role: z.enum(["editor", "viewer"]),
 });
 
-// Membership payloads are tiny (an email + a role); 4 KB is generous headroom.
+// Body-size cap on the invite payload.
+// - The actual body is just `{ email, role }` — under 300 bytes even with
+//   long emails. 4 KB gives 10x headroom without opening the door to abuse.
+// - A larger cap would only ever help an attacker, since there's nothing
+//   legitimate to spend it on.
 const MAX_MEMBER_BYTES = 4_000;
-// Owners generally invite in bursts — 30/min is comfortable interactive use.
+
+// Per-user rate limit on membership writes (invite / role change / remove).
+// - 30 per 60-second sliding window comfortably supports an owner
+//   onboarding a class of ~30 students in one burst.
+// - Same bucket key `members:<userId>` is shared across POST, PATCH, and
+//   DELETE so scripting the whole flow can't sidestep the ceiling.
 const MEMBER_WRITE_RATE = { limit: 30, windowMs: 60_000 } as const;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
