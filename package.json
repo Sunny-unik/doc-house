@@ -14,12 +14,14 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.12",
     "@neondatabase/serverless": "^1.1.0",
     "@tiptap/extension-collaboration": "^3.27.3",
     "@tiptap/pm": "^3.27.3",
     "@tiptap/react": "^3.27.3",
     "@tiptap/starter-kit": "^3.27.3",
     "@tiptap/y-tiptap": "^3.0.6",
+    "ai": "^7.0.22",
     "drizzle-orm": "^0.45.2",
     "idb": "^8.0.3",
     "next": "16.2.10",

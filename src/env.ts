@@ -6,6 +6,9 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required (Neon connection string)"),
   AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required (generate with: npx auth secret)"),
+  // Optional: gates the AI assistant routes. When missing, those routes return
+  // 501 and the client hides the feature — the app remains fully usable.
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
