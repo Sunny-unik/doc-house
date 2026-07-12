@@ -3,6 +3,7 @@
 import Collaboration from "@tiptap/extension-collaboration";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { AIAssistant } from "@/components/documents/AIAssistant";
 import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel";
 import { YJS_FRAGMENT } from "@/lib/collab";
 import { ConnectionStatus } from "./ConnectionStatus";
@@ -37,6 +38,8 @@ export function Editor({ documentId, editable }: { documentId: string; editable:
         {editable ? <ConnectionStatus status={status} /> : null}
         <span>{loaded ? "Saved locally" : "Loading…"}</span>
       </div>
+
+      <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />
 
       <VersionHistoryPanel
         documentId={documentId}
