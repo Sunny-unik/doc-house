@@ -137,7 +137,7 @@ export function MembersPanel({
             disabled={pending || !inviteEmail.trim()}
             className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
           >
-            {pending ? "Inviting…" : "Invite"}
+            {pending ? "Assigning…" : "Assign access"}
           </button>
         </form>
       ) : null}
