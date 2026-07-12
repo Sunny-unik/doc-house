@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,10 +14,20 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
         env:
-          # Build must not require real secrets; provide harmless placeholders.
+          # Build must not require real secrets. env.ts validates DATABASE_URL
+          # and AUTH_SECRET at import time, so we provide harmless placeholders
+          # that are only good enough to pass the string-length check.
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           AUTH_SECRET: ci-placeholder-secret-not-used-at-build
