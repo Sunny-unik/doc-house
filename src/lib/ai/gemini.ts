@@ -8,9 +8,10 @@ export function isAiConfigured() {
   return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 }
 
-// Flash is a good default: fast, cheap, and easily good enough for
-// per-document tasks like summarising or titling a page of prose.
-const MODEL = "gemini-2.5-flash";
+// Flash-Lite is the current cheap-and-fast tier and is more than enough for
+// per-document tasks like summarising or titling a page of prose. Bump to
+// gemini-2.5-pro if you want higher quality at the cost of latency + spend.
+const MODEL = "gemini-2.5-flash-lite";
 
 export async function summarizeDocument(content: string): Promise<string> {
   const { text } = await generateText({
