@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { DeleteDocumentButton } from "@/components/documents/DeleteDocumentButton";
 import { DocumentTitle } from "@/components/documents/DocumentTitle";
+import { MembersPanel } from "@/components/documents/MembersPanel";
 import { DocumentEditor } from "@/components/editor/DocumentEditor";
-import { getDocumentForUser } from "@/db/dal/documents";
+import { getDocumentForUser, listDocumentMembers } from "@/db/dal/documents";
 
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,7 +13,9 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   // Non-members (and unknown ids) get a 404 — we don't reveal that the doc exists.
   const doc = session?.user?.id ? await getDocumentForUser(id, session.user.id) : null;
-  if (!doc) notFound();
+  if (!doc || !session?.user?.id) notFound();
+
+  const members = await listDocumentMembers(doc.id);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-12">
@@ -31,6 +34,13 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <p className="mt-1 text-sm text-zinc-500">Your role: {doc.role}</p>
 
       <DocumentEditor documentId={doc.id} editable={doc.role !== "viewer"} />
+
+      <MembersPanel
+        documentId={doc.id}
+        currentUserId={session.user.id}
+        currentUserRole={doc.role}
+        initialMembers={members}
+      />
     </main>
   );
 }
