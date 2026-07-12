@@ -8,10 +8,12 @@ export function isAiConfigured() {
   return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 }
 
-// Flash-Lite is the current cheap-and-fast tier and is more than enough for
-// per-document tasks like summarising or titling a page of prose. Bump to
-// gemini-2.5-pro if you want higher quality at the cost of latency + spend.
-const MODEL = "gemini-2.5-flash-lite";
+// The `-latest` aliases follow Google's current-generation flash tier so we
+// don't have to chase model deprecations every quarter. Bump to
+// `gemini-pro-latest` if you want higher quality at the cost of latency and
+// spend, or pin to a specific version (e.g. `gemini-3.5-flash`) for
+// reproducibility across environments.
+const MODEL = "gemini-flash-latest";
 
 export async function summarizeDocument(content: string): Promise<string> {
   const { text } = await generateText({
