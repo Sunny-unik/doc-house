@@ -8,6 +8,27 @@ import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
 
 export type SyncStatus = "synced" | "syncing" | "offline" | "error";
 
+// The server returns 403 when the caller has been downgraded to viewer, or 404
+// when they've been removed entirely. We treat both as a signal that the local
+// Y.Doc is now polluted with edits the server never accepted — the only safe
+// remedy is to discard local state and restart from the server's truth.
+async function discardAndReset(
+  persistence: IndexeddbPersistence,
+  redirectTo: string | null,
+) {
+  try {
+    await persistence.clearData();
+  } catch {
+    /* store already gone or blocked — the reload will still recover */
+  }
+  if (typeof window === "undefined") return;
+  if (redirectTo) {
+    window.location.href = redirectTo;
+  } else {
+    window.location.reload();
+  }
+}
+
 // Owns the document's Y.Doc, its local IndexedDB persistence, and the automatic
 // server sync. Sync is triggered by: initial load, each local edit (debounced),
 // and coming back online. No constant polling — so it's "auto-sync", not realtime.
@@ -48,6 +69,20 @@ export function useDocProvider(documentId: string, editable: boolean) {
             stateVector: bytesToBase64(Y.encodeStateVector(ydoc)),
           }),
         });
+        if (res.status === 403 || res.status === 404) {
+          // Role revoked or membership dropped mid-session. Stop accepting
+          // further edits, wipe the polluted local store, and reload from the
+          // server's canonical state. 404 also means we've lost access
+          // entirely — bounce back to the doc list.
+          cancelled = true;
+          if (typeof window !== "undefined") {
+            window.alert(
+              "Your access to this document has changed. Local edits made after that will be discarded.",
+            );
+          }
+          await discardAndReset(persistence, res.status === 404 ? "/app" : null);
+          return;
+        }
         if (!res.ok) throw new Error(String(res.status));
         const data: { update: string } = await res.json();
         // Origin "remote" so applying the server's diff doesn't re-trigger a push.
