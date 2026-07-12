@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { renameDocumentOffline } from "@/lib/offline/mutations";
 
 export function DocumentTitle({
@@ -14,6 +14,16 @@ export function DocumentTitle({
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [pending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // The server component owns the canonical title. Anytime the SSR value shifts
+  // (e.g. a `router.refresh()` after applying an AI-suggested title, or a live
+  // rename from another surface), pull that value into local state — but never
+  // clobber whatever the user is actively typing right now.
+  useEffect(() => {
+    if (document.activeElement === inputRef.current) return;
+    setTitle(initialTitle);
+  }, [initialTitle]);
 
   if (!editable) {
     return (
@@ -32,6 +42,7 @@ export function DocumentTitle({
 
   return (
     <input
+      ref={inputRef}
       value={title}
       onChange={(e) => setTitle(e.target.value)}
       onBlur={commit}
