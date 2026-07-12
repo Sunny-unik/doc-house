@@ -63,6 +63,14 @@ npm run build && npm run start   # production build
 
 Then visit [http://localhost:3000](http://localhost:3000), register an account, and start writing.
 
+### 5. Tests
+
+```bash
+npm test          # runs the vitest suite once
+```
+
+Coverage is focused on the pure-logic core the assignment explicitly asks about — the append-only sync engine (`materializeDoc`, CRDT convergence, concurrent-edit merging), the bounded-stream payload guard that stops OOM attacks, and the sliding-window rate limiter. Full API + editor integration coverage is intentionally out of scope for this iteration.
+
 ## Architecture notes
 
 ### Sync engine
@@ -80,6 +88,25 @@ Every doc read joins through `DocumentMembership.userId`, so tenant isolation ha
 ### Version history
 
 Snapshots store the raw Yjs state at a point in time along with `upToUpdateId` (the log cursor at snapshot time), making each row self-describing. Restore materialises the snapshot in a headless Tiptap editor bound to a throwaway Y.Doc, extracts prosemirror JSON, and calls `setContent` on the live editor. Because the live editor is bound to the shared Y.Doc via `@tiptap/extension-collaboration`, the restore is expressed as normal Yjs ops that propagate through the sync pipeline — the append-only log is never rewritten and other collaborators see the restore as a regular edit.
+
+### Configured limits
+
+Every write endpoint applies a body-size cap (bounded-stream read → 413 on overflow) and a per-user sliding-window rate limit (→ 429 with `Retry-After` on overflow). All numbers live next to their constants in code — this table is the single-glance reference:
+
+| Endpoint | Body cap | Rate limit | Bucket key |
+|---|---|---|---|
+| `POST /api/documents/[id]/sync` | 4 MB envelope, 1.5 MB per base64 field (≈1.1 MB binary) | 120 / 60 s | `sync:<userId>` |
+| `POST /api/documents/[id]/versions` | 4 MB envelope, 6 MB base64 field, 200-char label | 30 / 60 s | `snap:<userId>` |
+| `POST /api/documents/[id]/members` (invite) | 4 KB envelope, 254-char email | 30 / 60 s | `members:<userId>` |
+| `PATCH /api/documents/[id]/members/[userId]` (role change) | 1 KB envelope | shares `members:<userId>` bucket | same as above |
+| `DELETE /api/documents/[id]/members/[userId]` (revoke / leave) | no body | shares `members:<userId>` bucket | same as above |
+| `POST /api/documents/[id]/ai/summarize` | 200 KB envelope, 100 000-char content | 20 / 60 s | `ai:<userId>` (shared with title) |
+| `POST /api/documents/[id]/ai/suggest-title` | 200 KB envelope, 100 000-char content | shares `ai:<userId>` bucket | same as above |
+
+Other shipping limits:
+
+- **Document list pagination** — `DOCS_PAGE_SIZE = 5` documents per page (`src/db/dal/documents.ts`).
+- **Editor sync debounce** — `1200 ms` of typing silence before a client push (`src/components/editor/useDocProvider.ts`). The keystrokes themselves are always instant; only the server round-trip waits.
 
 ### Payload defence
 
