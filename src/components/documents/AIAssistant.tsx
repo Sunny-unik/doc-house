@@ -86,7 +86,7 @@ export function AIAssistant({
     <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
       <h2 className="text-lg font-semibold tracking-tight">Assistant</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        Summarise the document or suggest a title based on what you've written so far.
+        Summarise the document or suggest a title based on what you&apos;ve written so far.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
