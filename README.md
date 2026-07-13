@@ -6,7 +6,7 @@ Built as the fullstack developer assignment for House of Edtech.
 
 ## Live demo
 
-_TBD — deployment link goes here once the Vercel project is up._
+**[sunny-doc-house.vercel.app](https://sunny-doc-house.vercel.app)**
 
 ## Highlights
 
