@@ -4,8 +4,9 @@ import Collaboration from "@tiptap/extension-collaboration";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { AIAssistant } from "@/components/documents/AIAssistant";
+import { ShareLinksPanel } from "@/components/documents/ShareLinksPanel";
 import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel";
-import { Tabs } from "@/components/ui/Tabs";
+import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { YJS_FRAGMENT } from "@/lib/collab";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { Toolbar } from "./Toolbar";
@@ -15,10 +16,12 @@ import "./editor.css";
 export function Editor({
   documentId,
   editable,
+  isOwner,
   membersPanel,
 }: {
   documentId: string;
   editable: boolean;
+  isOwner: boolean;
   // Rendered by the server component (it needs the member list and session), then
   // handed down so it can live alongside the panels that depend on the Y.Doc.
   membersPanel: React.ReactNode;
@@ -39,6 +42,37 @@ export function Editor({
     },
   });
 
+  const tabs: TabItem[] = [
+    {
+      id: "assistant",
+      label: "Assistant",
+      content: <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />,
+    },
+    {
+      id: "history",
+      label: "Version history",
+      content: (
+        <VersionHistoryPanel
+          documentId={documentId}
+          ydoc={ydoc}
+          editor={editor}
+          canEdit={editable}
+        />
+      ),
+    },
+    { id: "people", label: "People", content: membersPanel },
+  ];
+
+  // Share links are an owner-only power, and the API enforces that too — this
+  // just avoids showing a tab that would only ever return 403.
+  if (isOwner) {
+    tabs.push({
+      id: "share",
+      label: "Share",
+      content: <ShareLinksPanel documentId={documentId} />,
+    });
+  }
+
   return (
     <div className="mt-5">
       {editable && editor ? <Toolbar editor={editor} /> : null}
@@ -53,31 +87,7 @@ export function Editor({
       </div>
 
       <div className="mt-10">
-        <Tabs
-          label="Document tools"
-          tabs={[
-            {
-              id: "assistant",
-              label: "Assistant",
-              content: (
-                <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />
-              ),
-            },
-            {
-              id: "history",
-              label: "Version history",
-              content: (
-                <VersionHistoryPanel
-                  documentId={documentId}
-                  ydoc={ydoc}
-                  editor={editor}
-                  canEdit={editable}
-                />
-              ),
-            },
-            { id: "people", label: "People", content: membersPanel },
-          ]}
-        />
+        <Tabs label="Document tools" tabs={tabs} />
       </div>
     </div>
   );

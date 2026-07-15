@@ -13,6 +13,7 @@ const Editor = dynamic(() => import("./Editor").then((m) => m.Editor), {
 export function DocumentEditor(props: {
   documentId: string;
   editable: boolean;
+  isOwner: boolean;
   membersPanel: React.ReactNode;
 }) {
   return <Editor {...props} />;

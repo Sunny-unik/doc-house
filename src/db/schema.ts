@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   customType,
   index,
   pgEnum,
@@ -40,6 +41,13 @@ export const users = pgTable("User", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("passwordHash").notNull(),
+  // Someone who arrived through a share link instead of registering. They get a
+  // real row so that every `createdBy` foreign key keeps working — the whole
+  // membership/authz stack then treats them like any other user, with no
+  // parallel "maybe it's a guest" branch anywhere. Their email is synthetic and
+  // their passwordHash is deliberately unusable, so they can never sign in
+  // through the credentials form.
+  isGuest: boolean("isGuest").notNull().default(false),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -90,6 +98,40 @@ export const documentUpdates = pgTable(
     createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("DocumentUpdate_documentId_id_idx").on(t.documentId, t.id)],
+);
+
+// A shareable link that grants access to one document without an account.
+//
+// The token is stored as-is rather than hashed, and that's a considered call:
+// unlike a password, this token is meant to be re-read and re-copied by the
+// owner long after it's minted, so a one-way hash would mean "generate a new
+// link every time you want to send it". The threat model differs too — a hash
+// protects a password because users reuse passwords elsewhere, whereas anyone
+// who has read access to this table already has read access to the documents
+// themselves, so hashing would buy nothing here.
+export const shareLinks = pgTable(
+  "ShareLink",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("documentId")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    // Only ever "editor" or "viewer" — a link can't hand out ownership. The
+    // enum is shared with memberships, so the API validates the narrow set.
+    role: docRole("role").notNull(),
+    // Null means the link never expires.
+    expiresAt: timestamp("expiresAt", { withTimezone: true }),
+    // Soft-revoke: we keep the row so an old link resolves to "revoked" rather
+    // than the indistinguishable "never existed", and so the audit trail of who
+    // shared what survives.
+    revokedAt: timestamp("revokedAt", { withTimezone: true }),
+    createdBy: uuid("createdBy")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ShareLink_documentId_idx").on(t.documentId)],
 );
 
 export const versionSnapshots = pgTable(
