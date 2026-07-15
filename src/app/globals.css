@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
+/* Semantic colour tokens.
+ *
+ * Every value is defined once here and again in the dark block below, so
+ * components reference the *role* (surface, line, text-muted) and never a raw
+ * zinc shade. That's why you won't find `dark:` variants scattered through the
+ * components — the token flips, the markup doesn't.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --canvas: #fafafa;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f5;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-subtle: #8b8b94;
+
+  --accent: #18181b;
+  --accent-hover: #3f3f46;
+  --accent-fg: #ffffff;
+
+  --ring: #71717a;
+
+  --success: #047857;
+  --success-soft: #ecfdf5;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --canvas: #09090b;
+    --surface: #101013;
+    --surface-muted: #1b1b1f;
+
+    --line: #27272a;
+    --line-strong: #3f3f46;
+
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-subtle: #71717a;
+
+    --accent: #fafafa;
+    --accent-hover: #d4d4d8;
+    --accent-fg: #09090b;
+
+    --ring: #a1a1aa;
+
+    --success: #34d399;
+    --success-soft: #04231b;
+    --danger: #f87171;
+    --danger-soft: #2a1113;
+    --warning: #fbbf24;
+    --warning-soft: #271c06;
   }
 }
 
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Default border colour to the token so bare `border` matches the theme. */
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--line);
+  }
+}
+
+/* Respect users who ask the OS to tone motion down. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::after,
+  ::before {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

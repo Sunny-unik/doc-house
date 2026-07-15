@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { Button } from "@/components/ui/Button";
+import { FieldNote, Input, Label } from "@/components/ui/Input";
 import { register } from "@/lib/auth-actions";
 
 export default function RegisterPage() {
@@ -9,74 +11,47 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        Create your account
-      </h1>
-      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Start writing in docHouse.
-      </p>
+      <h1 className="text-2xl font-semibold tracking-tight text-text">Create your account</h1>
+      <p className="mt-1.5 text-sm text-text-muted">Start writing in docHouse.</p>
 
-      <form action={formAction} className="mt-6 space-y-4">
+      <form action={formAction} className="mt-7 space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium">
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            required
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:focus:border-zinc-100"
-          />
+          <Label htmlFor="name">Name</Label>
+          <Input id="name" name="name" type="text" autoComplete="name" required />
         </div>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:focus:border-zinc-100"
-          />
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" required />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium">
-            Password
-          </label>
-          <input
+          <Label htmlFor="password">Password</Label>
+          <Input
             id="password"
             name="password"
             type="password"
             autoComplete="new-password"
             required
             minLength={8}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:focus:border-zinc-100"
+            aria-describedby="password-hint"
           />
-          <p className="mt-1 text-xs text-zinc-500">At least 8 characters.</p>
+          <FieldNote>
+            <span id="password-hint">At least 8 characters.</span>
+          </FieldNote>
         </div>
 
-        {state.error && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {state.error}
-          </p>
-        )}
+        {state.error ? <FieldNote tone="error">{state.error}</FieldNote> : null}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
+        <Button type="submit" size="lg" disabled={pending} className="w-full">
           {pending ? "Creating account…" : "Create account"}
-        </button>
+        </Button>
       </form>
 
-      <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-6 text-center text-sm text-text-muted">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-zinc-900 underline dark:text-zinc-100">
+        <Link
+          href="/login"
+          className="rounded font-medium text-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           Sign in
         </Link>
       </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Dot } from "@/components/ui/Badge";
 
 // Surfaces offline state app-wide. Editing keeps working offline (local-first),
 // but navigating to server-rendered routes needs a connection — so we say so
@@ -26,9 +27,10 @@ export function OfflineBanner() {
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 bg-amber-500 px-4 py-2 text-center text-sm font-medium text-amber-950"
+      className="sticky top-0 z-50 flex items-center justify-center gap-2 border-b border-warning/30 bg-warning-soft px-4 py-2 text-center text-sm font-medium text-warning"
     >
-      You’re offline — your edits are saved locally. Opening other documents needs a connection.
+      <Dot className="bg-warning" />
+      You&rsquo;re offline — edits are saved locally and will sync when you reconnect.
     </div>
   );
 }

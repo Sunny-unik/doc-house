@@ -18,7 +18,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const members = await listDocumentMembers(doc.id);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-12">
+    <main id="main" className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-12">
       <Link href="/app" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
         ← All documents
       </Link>
