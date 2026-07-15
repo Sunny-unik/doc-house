@@ -2,29 +2,33 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { createDocumentOffline } from "@/lib/offline/mutations";
 
 export function NewDocumentButton() {
   const router = useRouter();
+  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
 
   function onNew() {
     startTransition(async () => {
       const id = await createDocumentOffline();
       // Online: the doc now exists server-side, so open it. Offline: it's queued
-      // and cached; opening it offline needs the service worker (next step).
-      if (navigator.onLine) router.push(`/app/${id}`);
+      // and cached, and opening it would need a server render we can't reach —
+      // so stay put and say what happened instead of navigating into an error.
+      if (navigator.onLine) {
+        router.push(`/app/${id}`);
+      } else {
+        toast("Document created offline. It'll sync when you reconnect.", "info");
+        router.refresh();
+      }
     });
   }
 
   return (
-    <button
-      type="button"
-      onClick={onNew}
-      disabled={pending}
-      className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-    >
+    <Button onClick={onNew} disabled={pending}>
       {pending ? "Creating…" : "New document"}
-    </button>
+    </Button>
   );
 }

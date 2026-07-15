@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { type DocRole, documentMemberships, documents, users } from "@/db/schema";
 
@@ -10,12 +10,30 @@ import { type DocRole, documentMemberships, documents, users } from "@/db/schema
 // prefetch on the client finishes in a couple of seconds per page turn.
 export const DOCS_PAGE_SIZE = 5;
 
-// Paginated list. We fetch one extra row to know if there's a next page without
-// a separate count query, then trim it off.
+// Longest search term we'll act on. Titles are short; anything past this is
+// noise (or someone probing), so we trim rather than hand it to the database.
+export const MAX_SEARCH_LENGTH = 100;
+
+// Drizzle parameterises the value, so this isn't about injection — it's that
+// `%` and `_` are wildcards to ILIKE. A user searching for "50%" means the
+// literal characters, not "50 followed by anything".
+function escapeLike(term: string) {
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+// Paginated list, optionally filtered by title. We fetch one extra row to know
+// if there's a next page without a separate count query, then trim it off.
 export async function listDocumentsForUser(
   userId: string,
-  { limit = DOCS_PAGE_SIZE, offset = 0 }: { limit?: number; offset?: number } = {},
+  {
+    limit = DOCS_PAGE_SIZE,
+    offset = 0,
+    search = "",
+  }: { limit?: number; offset?: number; search?: string } = {},
 ) {
+  const term = search.trim().slice(0, MAX_SEARCH_LENGTH);
+  const scope = eq(documentMemberships.userId, userId);
+
   const rows = await db
     .select({
       id: documents.id,
@@ -25,7 +43,9 @@ export async function listDocumentsForUser(
     })
     .from(documents)
     .innerJoin(documentMemberships, eq(documentMemberships.documentId, documents.id))
-    .where(eq(documentMemberships.userId, userId))
+    // The membership scope is always ANDed in — a search term narrows the
+    // caller's own documents, it can never widen the set beyond them.
+    .where(term ? and(scope, ilike(documents.title, `%${escapeLike(term)}%`)) : scope)
     .orderBy(desc(documents.updatedAt))
     .limit(limit + 1)
     .offset(offset);
