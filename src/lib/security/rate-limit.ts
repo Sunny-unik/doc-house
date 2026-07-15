@@ -9,18 +9,20 @@
 // timestamps per bucket, drop entries older than the window on each check.
 // O(hits-in-window) per request, which is fine at our scale.
 
-type Bucket = { hits: number[] };
+// A bucket records the window it was last used with, so the sweep can prune it
+// against its own window rather than whichever caller happens to trigger it.
+type Bucket = { hits: number[]; windowMs: number };
 
 const store = new Map<string, Bucket>();
 
 // Best-effort cleanup so idle buckets don't linger forever. Runs at most once
 // per minute on any call.
 let lastSweep = 0;
-function maybeSweep(now: number, maxAge: number) {
+function maybeSweep(now: number) {
   if (now - lastSweep < 60_000) return;
   lastSweep = now;
   for (const [key, bucket] of store) {
-    const cutoff = now - maxAge;
+    const cutoff = now - bucket.windowMs;
     bucket.hits = bucket.hits.filter((t) => t > cutoff);
     if (bucket.hits.length === 0) store.delete(key);
   }
@@ -41,9 +43,10 @@ export function rateLimit(
   { limit, windowMs }: { limit: number; windowMs: number },
 ): RateLimitResult {
   const now = Date.now();
-  maybeSweep(now, windowMs);
+  maybeSweep(now);
 
-  const bucket = store.get(key) ?? { hits: [] };
+  const bucket = store.get(key) ?? { hits: [], windowMs };
+  bucket.windowMs = windowMs;
   const cutoff = now - windowMs;
   bucket.hits = bucket.hits.filter((t) => t > cutoff);
 

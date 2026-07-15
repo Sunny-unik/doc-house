@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { rateLimit } from "./rate-limit";
 
 // The limiter has module-level state. Using a random key per test isolates
@@ -62,5 +62,39 @@ describe("rateLimit", () => {
     }
 
     expect(rateLimit(key, opts).ok).toBe(true);
+  });
+
+  // Kept last: it leaves the module-level sweep timestamp in the future, which
+  // suppresses sweeps in any test that runs after it. Harmless here (nothing
+  // else asserts on sweeping), but add new tests above this one.
+  it("sweeps each bucket against its own window, not the caller's", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+
+      const hourly = uniqueKey("hourly");
+      const hourOpts = { limit: 2, windowMs: 3_600_000 };
+      const minutely = uniqueKey("minutely");
+      const minuteOpts = { limit: 100, windowMs: 60_000 };
+
+      // Prime the sweep gate so the sweep we care about is the one below.
+      rateLimit(minutely, minuteOpts);
+
+      // Exhaust the hourly bucket.
+      expect(rateLimit(hourly, hourOpts).ok).toBe(true);
+      expect(rateLimit(hourly, hourOpts).ok).toBe(true);
+      expect(rateLimit(hourly, hourOpts).ok).toBe(false);
+
+      // Two minutes on, a short-window caller triggers a sweep. The hourly
+      // bucket's hits are older than the 60s window that caller passes, but
+      // still well inside the hour the bucket was configured with.
+      vi.advanceTimersByTime(120_000);
+      rateLimit(minutely, minuteOpts);
+
+      // The sweep must not have discarded them.
+      expect(rateLimit(hourly, hourOpts).ok).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
