@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { type CachedDoc, cacheDocs, getCachedDocs } from "@/lib/offline/docs-cache";
 
@@ -13,9 +12,11 @@ const roleLabel: Record<string, string> = {
 export function DocumentList({
   initialDocs,
   initialHasMore,
+  onOpen,
 }: {
   initialDocs: CachedDoc[];
   initialHasMore: boolean;
+  onOpen: (id: string) => void;
 }) {
   const [docs, setDocs] = useState(initialDocs);
   const [page, setPage] = useState(1);
@@ -90,15 +91,22 @@ export function DocumentList({
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
         {docs.map((doc) => (
           <li key={doc.id}>
-            <Link
-              href={`/app/${doc.id}`}
+            <a
+              href={`/app?id=${doc.id}`}
+              onClick={(e) => {
+                // A plain click opens the doc client-side (no network). Modifier
+                // clicks fall through so "open in new tab" still works.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                onOpen(doc.id);
+              }}
               className="flex items-center justify-between gap-4 py-4 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
             >
               <span className="font-medium text-zinc-900 dark:text-zinc-100">{doc.title}</span>
               <span className="text-xs uppercase tracking-wide text-zinc-500">
                 {roleLabel[doc.role] ?? doc.role}
               </span>
-            </Link>
+            </a>
           </li>
         ))}
       </ul>

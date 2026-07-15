@@ -16,6 +16,13 @@ export async function getCachedDocs(): Promise<CachedDoc[]> {
   return all.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
+// Single-document metadata for the doc workspace — the offline source of truth
+// for a doc's title/role when the network is unavailable.
+export async function getCachedDoc(id: string): Promise<CachedDoc | undefined> {
+  const db = await getOfflineDb();
+  return db.get("documents", id);
+}
+
 export async function removeCachedDoc(id: string) {
   const db = await getOfflineDb();
   await db.delete("documents", id);

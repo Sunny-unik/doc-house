@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { DocRole } from "@/db/schema";
 
@@ -18,18 +17,19 @@ export function MembersPanel({
   currentUserId,
   currentUserRole,
   initialMembers,
+  onLeave,
 }: {
   documentId: string;
   currentUserId: string;
   currentUserRole: DocRole;
   initialMembers: Member[];
+  onLeave: () => void;
 }) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
   const [message, setMessage] = useState<Message>(null);
   const [pending, startTransition] = useTransition();
-  const router = useRouter();
 
   const isOwner = currentUserRole === "owner";
 
@@ -94,7 +94,7 @@ export function MembersPanel({
         return;
       }
       if (self) {
-        router.push("/app");
+        onLeave();
         return;
       }
       setMembers((prev) => prev.filter((m) => m.userId !== userId));

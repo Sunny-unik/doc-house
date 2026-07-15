@@ -1,9 +1,13 @@
 import { auth } from "@/auth";
-import { DocumentList } from "@/components/documents/DocumentList";
-import { NewDocumentButton } from "@/components/documents/NewDocumentButton";
+import { AppShell } from "@/components/documents/AppShell";
 import { DOCS_PAGE_SIZE, listDocumentsForUser } from "@/db/dal/documents";
 
-export default async function AppPage() {
+export default async function AppPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>;
+}) {
+  const { id } = await searchParams;
   const session = await auth();
   const { docs, hasMore } = session?.user?.id
     ? await listDocumentsForUser(session.user.id, { limit: DOCS_PAGE_SIZE })
@@ -17,16 +21,13 @@ export default async function AppPage() {
     updatedAt: new Date(doc.updatedAt).toISOString(),
   }));
 
+  // `id` only seeds the initial render (a direct visit / reload). After that,
+  // opening and closing documents is handled entirely client-side by AppShell.
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-12">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Documents
-        </h1>
-        <NewDocumentButton />
-      </div>
-
-      <DocumentList initialDocs={initialDocs} initialHasMore={hasMore} />
-    </main>
+    <AppShell
+      initialDocs={initialDocs}
+      initialHasMore={hasMore}
+      initialOpenId={id ?? null}
+    />
   );
 }

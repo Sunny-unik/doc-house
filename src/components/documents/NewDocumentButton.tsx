@@ -1,19 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { createDocumentOffline } from "@/lib/offline/mutations";
 
-export function NewDocumentButton() {
-  const router = useRouter();
+export function NewDocumentButton({ onOpen }: { onOpen: (id: string) => void }) {
   const [pending, startTransition] = useTransition();
 
   function onNew() {
     startTransition(async () => {
       const id = await createDocumentOffline();
-      // Online: the doc now exists server-side, so open it. Offline: it's queued
-      // and cached; opening it offline needs the service worker (next step).
-      if (navigator.onLine) router.push(`/app/${id}`);
+      // Opening is client-side state, so a freshly created doc opens whether
+      // we're online or offline (the create itself is queued in the outbox).
+      onOpen(id);
     });
   }
 
