@@ -27,9 +27,7 @@ export function DocumentTitle({
 
   if (!editable) {
     return (
-      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-        {initialTitle}
-      </h1>
+      <h1 className="truncate text-2xl font-semibold tracking-tight text-text">{initialTitle}</h1>
     );
   }
 
@@ -51,7 +49,9 @@ export function DocumentTitle({
       }}
       disabled={pending}
       aria-label="Document title"
-      className="w-full rounded-md border border-transparent bg-transparent px-1 text-2xl font-semibold tracking-tight text-zinc-900 outline-none hover:border-zinc-200 focus:border-zinc-300 disabled:opacity-60 dark:text-zinc-50 dark:hover:border-zinc-800 dark:focus:border-zinc-700"
+      // Borderless until hovered/focused so it reads as a heading, but still
+      // signals it's editable when you reach for it.
+      className="w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-2xl font-semibold tracking-tight text-text outline-none transition-colors hover:border-line focus:border-line-strong focus:bg-surface disabled:opacity-60"
     />
   );
 }

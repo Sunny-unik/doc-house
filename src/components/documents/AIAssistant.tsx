@@ -3,11 +3,12 @@
 import type { Editor } from "@tiptap/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { renameDocumentOffline } from "@/lib/offline/mutations";
 
 type Kind = "summary" | "title";
 type Result = { kind: Kind; text: string } | null;
-type Message = { kind: "error" | "info"; text: string } | null;
 
 export function AIAssistant({
   documentId,
@@ -19,17 +20,16 @@ export function AIAssistant({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [result, setResult] = useState<Result>(null);
-  const [message, setMessage] = useState<Message>(null);
   const [running, setRunning] = useState<Kind | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function run(kind: Kind) {
-    setMessage(null);
     if (!editor) return;
     const content = editor.getText().trim();
     if (!content) {
-      setMessage({ kind: "info", text: "Write something first — then I'll have material to work with." });
+      toast("Write something first — then I'll have material to work with.", "info");
       return;
     }
 
@@ -44,16 +44,12 @@ export function AIAssistant({
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-          setMessage({
-            kind: "error",
-            text: data?.error ?? "AI request failed. Please try again.",
-          });
+          toast(data?.error ?? "AI request failed. Please try again.", "error");
           return;
         }
-        const text = (kind === "summary" ? data.summary : data.title) as string;
-        setResult({ kind, text });
+        setResult({ kind, text: (kind === "summary" ? data.summary : data.title) as string });
       } catch {
-        setMessage({ kind: "error", text: "AI request failed. Please try again." });
+        toast("AI request failed. Please try again.", "error");
       } finally {
         setRunning(null);
       }
@@ -65,99 +61,61 @@ export function AIAssistant({
     setResult(null);
     try {
       await renameDocumentOffline(documentId, newTitle);
-      setMessage({ kind: "info", text: `Title updated to “${newTitle}”.` });
+      toast(`Title updated to “${newTitle}”.`, "success");
       // Server component owns the visible title; refresh so it re-renders.
       router.refresh();
     } catch {
-      setMessage({ kind: "error", text: "Couldn't apply the title." });
+      toast("Couldn't apply the title.", "error");
     }
   }
 
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setMessage({ kind: "info", text: "Copied to clipboard." });
+      toast("Copied to clipboard.", "success");
     } catch {
-      setMessage({ kind: "error", text: "Couldn't copy — select manually and copy." });
+      toast("Couldn't copy — select the text and copy manually.", "error");
     }
   }
 
   return (
-    <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-      <h2 className="text-lg font-semibold tracking-tight">Assistant</h2>
-      <p className="mt-1 text-sm text-zinc-500">
+    <div>
+      <p className="text-sm text-text-muted">
         Summarise the document or suggest a title based on what you&apos;ve written so far.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => run("summary")}
-          disabled={pending || !editor}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50 dark:border-zinc-700"
-        >
+        <Button variant="secondary" onClick={() => run("summary")} disabled={pending || !editor}>
           {running === "summary" ? "Summarising…" : "Summarise document"}
-        </button>
+        </Button>
         {canEdit ? (
-          <button
-            type="button"
-            onClick={() => run("title")}
-            disabled={pending || !editor}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50 dark:border-zinc-700"
-          >
+          <Button variant="secondary" onClick={() => run("title")} disabled={pending || !editor}>
             {running === "title" ? "Thinking…" : "Suggest title"}
-          </button>
+          </Button>
         ) : null}
       </div>
 
-      {message ? (
-        <p
-          role="status"
-          className={
-            message.kind === "error"
-              ? "mt-3 text-sm text-red-600 dark:text-red-400"
-              : "mt-3 text-sm text-zinc-600 dark:text-zinc-400"
-          }
-        >
-          {message.text}
-        </p>
-      ) : null}
-
       {result ? (
-        <div className="mt-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="text-xs uppercase tracking-wide text-zinc-500">
+        <div className="mt-5 rounded-xl border border-line bg-surface-muted p-4">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-text-subtle">
             {result.kind === "summary" ? "Summary" : "Suggested title"}
           </p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
-            {result.text}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => copy(result.text)}
-              className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium dark:border-zinc-700"
-            >
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-text">{result.text}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => copy(result.text)}>
               Copy
-            </button>
+            </Button>
             {result.kind === "title" && canEdit ? (
-              <button
-                type="button"
-                onClick={() => applyTitle(result.text)}
-                className="rounded-md border border-emerald-300 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:text-emerald-400"
-              >
-                Apply as document title
-              </button>
+              <Button size="sm" onClick={() => applyTitle(result.text)}>
+                Apply as title
+              </Button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setResult(null)}
-              className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium dark:border-zinc-700"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
               Dismiss
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { localDocKey } from "@/lib/collab";
 import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
 
@@ -38,6 +39,14 @@ export function useDocProvider(documentId: string, editable: boolean) {
   const [status, setStatus] = useState<SyncStatus>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "synced",
   );
+
+  // Held in a ref rather than an effect dependency: re-running the sync effect
+  // would tear down the Y.Doc's persistence and resync for nothing.
+  const confirm = useConfirm();
+  const confirmRef = useRef(confirm);
+  useEffect(() => {
+    confirmRef.current = confirm;
+  }, [confirm]);
 
   useEffect(() => {
     const persistence = new IndexeddbPersistence(localDocKey(documentId), ydoc);
@@ -75,11 +84,17 @@ export function useDocProvider(documentId: string, editable: boolean) {
           // server's canonical state. 404 also means we've lost access
           // entirely — bounce back to the doc list.
           cancelled = true;
-          if (typeof window !== "undefined") {
-            window.alert(
-              "Your access to this document has changed. Local edits made after that will be discarded.",
-            );
-          }
+          // Acknowledge-only, and deliberately blocking: the reset reloads the
+          // page, so anything non-blocking would vanish before it was read.
+          await confirmRef.current({
+            title: "Your access to this document changed",
+            body:
+              res.status === 404
+                ? "You no longer have access. Any edits made since then can't be saved and will be discarded."
+                : "You're now a viewer. Any edits made since the change can't be saved and will be discarded.",
+            confirmLabel: "Continue",
+            hideCancel: true,
+          });
           await discardAndReset(persistence, res.status === 404 ? "/app" : null);
           return;
         }

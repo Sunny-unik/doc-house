@@ -7,9 +7,13 @@ import dynamic from "next/dynamic";
 // client component, which is what this thin wrapper is for.
 const Editor = dynamic(() => import("./Editor").then((m) => m.Editor), {
   ssr: false,
-  loading: () => <p className="mt-4 text-sm text-zinc-500">Loading editor…</p>,
+  loading: () => <p className="mt-5 text-sm text-text-muted">Loading editor…</p>,
 });
 
-export function DocumentEditor(props: { documentId: string; editable: boolean }) {
+export function DocumentEditor(props: {
+  documentId: string;
+  editable: boolean;
+  membersPanel: React.ReactNode;
+}) {
   return <Editor {...props} />;
 }

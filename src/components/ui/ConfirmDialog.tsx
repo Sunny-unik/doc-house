@@ -9,6 +9,9 @@ type ConfirmOptions = {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: "primary" | "danger";
+  // Drops the cancel button, turning this into an acknowledge-only dialog —
+  // the `window.alert` shape, for cases where there's nothing to decline.
+  hideCancel?: boolean;
 };
 
 type Pending = ConfirmOptions & { resolve: (ok: boolean) => void };
@@ -71,9 +74,11 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <p className="mt-2 text-sm leading-6 text-text-muted">{pending.body}</p>
             ) : null}
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => settle(false)}>
-                {pending.cancelLabel ?? "Cancel"}
-              </Button>
+              {pending.hideCancel ? null : (
+                <Button variant="secondary" size="sm" onClick={() => settle(false)}>
+                  {pending.cancelLabel ?? "Cancel"}
+                </Button>
+              )}
               <Button
                 variant={pending.tone === "danger" ? "danger" : "primary"}
                 size="sm"

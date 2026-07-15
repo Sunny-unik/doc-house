@@ -5,13 +5,24 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { AIAssistant } from "@/components/documents/AIAssistant";
 import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel";
+import { Tabs } from "@/components/ui/Tabs";
 import { YJS_FRAGMENT } from "@/lib/collab";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { Toolbar } from "./Toolbar";
 import { useDocProvider } from "./useDocProvider";
 import "./editor.css";
 
-export function Editor({ documentId, editable }: { documentId: string; editable: boolean }) {
+export function Editor({
+  documentId,
+  editable,
+  membersPanel,
+}: {
+  documentId: string;
+  editable: boolean;
+  // Rendered by the server component (it needs the member list and session), then
+  // handed down so it can live alongside the panels that depend on the Y.Doc.
+  membersPanel: React.ReactNode;
+}) {
   // The provider owns the Y.Doc, local persistence, and automatic server sync.
   const { ydoc, loaded, status } = useDocProvider(documentId, editable);
 
@@ -29,24 +40,45 @@ export function Editor({ documentId, editable }: { documentId: string; editable:
   });
 
   return (
-    <div className="mt-4">
+    <div className="mt-5">
       {editable && editor ? <Toolbar editor={editor} /> : null}
-      <div className="mt-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+
+      <div className="mt-3 rounded-xl border border-line bg-surface px-5 py-4">
         <EditorContent editor={editor} />
       </div>
-      <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
+
+      <div className="mt-2.5 flex items-center gap-3 px-1 text-xs text-text-subtle">
         {editable ? <ConnectionStatus status={status} /> : null}
         <span>{loaded ? "Saved locally" : "Loading…"}</span>
       </div>
 
-      <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />
-
-      <VersionHistoryPanel
-        documentId={documentId}
-        ydoc={ydoc}
-        editor={editor}
-        canEdit={editable}
-      />
+      <div className="mt-10">
+        <Tabs
+          label="Document tools"
+          tabs={[
+            {
+              id: "assistant",
+              label: "Assistant",
+              content: (
+                <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />
+              ),
+            },
+            {
+              id: "history",
+              label: "Version history",
+              content: (
+                <VersionHistoryPanel
+                  documentId={documentId}
+                  ydoc={ydoc}
+                  editor={editor}
+                  canEdit={editable}
+                />
+              ),
+            },
+            { id: "people", label: "People", content: membersPanel },
+          ]}
+        />
+      </div>
     </div>
   );
 }
