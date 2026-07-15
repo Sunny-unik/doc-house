@@ -21,16 +21,18 @@ export const authConfig = {
         token.id = user.id;
         if (user.email) token.email = user.email;
         if (user.name) token.name = user.name;
+        token.isGuest = user.isGuest ?? false;
       }
       return token;
     },
-    // Expose id/email/name to the app via the session.
+    // Expose id/email/name/isGuest to the app via the session.
     session({ session, token }) {
       if (token.id) {
         session.user.id = token.id as string;
       }
       if (typeof token.email === "string") session.user.email = token.email;
       if (typeof token.name === "string") session.user.name = token.name;
+      session.user.isGuest = Boolean(token.isGuest);
       return session;
     },
   },

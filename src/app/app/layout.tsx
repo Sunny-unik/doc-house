@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { OutboxFlusher } from "@/components/offline/OutboxFlusher";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { siteConfig } from "@/config/site";
 import { logout } from "@/lib/auth-actions";
@@ -36,14 +37,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               {initials(user?.name, user?.email)}
             </span>
-            {/* The email is decoration next to the avatar — drop it on narrow
-                screens rather than letting it squeeze the sign-out button. */}
-            <span className="hidden min-w-0 truncate text-sm text-text-muted sm:block">
-              {user?.email}
+            {/* Decoration next to the avatar — dropped on narrow screens rather
+                than letting it squeeze the sign-out button. Guests get their
+                display name, since their address is synthetic. */}
+            <span className="hidden min-w-0 items-center gap-2 truncate text-sm text-text-muted sm:flex">
+              {user?.isGuest ? (
+                <>
+                  {user.name}
+                  <Badge>Guest</Badge>
+                </>
+              ) : (
+                user?.email
+              )}
             </span>
             <form action={logout}>
               <Button type="submit" variant="secondary" size="sm">
-                Sign out
+                {user?.isGuest ? "Leave" : "Sign out"}
               </Button>
             </form>
           </div>

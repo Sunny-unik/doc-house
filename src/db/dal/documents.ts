@@ -54,6 +54,19 @@ export async function listDocumentsForUser(
   return { docs: hasMore ? rows.slice(0, limit) : rows, hasMore };
 }
 
+// Title only, with no membership check — deliberately. The one caller is the
+// share-link landing page, where the token in the URL *is* the authorization,
+// and the visitor has no membership yet by definition. Never use this on a path
+// where the caller's access hasn't already been established some other way.
+export async function getDocumentTitle(documentId: string) {
+  const [row] = await db
+    .select({ title: documents.title })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1);
+  return row?.title ?? null;
+}
+
 // Lightweight role lookup for API authorization — just the caller's role, or null.
 export async function getMembershipRole(documentId: string, userId: string) {
   const [row] = await db
@@ -103,6 +116,7 @@ export async function listDocumentMembers(documentId: string) {
       userId: users.id,
       email: users.email,
       name: users.name,
+      isGuest: users.isGuest,
       role: documentMemberships.role,
       createdAt: documentMemberships.createdAt,
     })

@@ -9,6 +9,8 @@ export default async function AppPage() {
     ? await listDocumentsForUser(session.user.id, { limit: DOCS_PAGE_SIZE })
     : { docs: [], hasMore: false };
 
+  const isGuest = session?.user?.isGuest ?? false;
+
   // Normalize for the client component + cache (timestamps as ISO strings).
   const initialDocs = docs.map((doc) => ({
     id: doc.id,
@@ -23,10 +25,15 @@ export default async function AppPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-text">Documents</h1>
           <p className="mt-1 text-sm text-text-muted">
-            Everything you own or have been given access to.
+            {isGuest
+              ? "Documents you've opened with a share link."
+              : "Everything you own or have been given access to."}
           </p>
         </div>
-        <NewDocumentButton />
+        {/* Guests are here for someone else's document — creating their own
+            would leave orphaned files behind an identity they can't sign back
+            into. */}
+        {isGuest ? null : <NewDocumentButton />}
       </div>
 
       <DocumentList initialDocs={initialDocs} initialHasMore={hasMore} />

@@ -14,6 +14,7 @@ type Member = {
   userId: string;
   email: string;
   name: string;
+  isGuest: boolean;
   role: DocRole;
 };
 
@@ -175,13 +176,19 @@ export function MembersPanel({
                       <span className="ml-2 text-xs font-normal text-text-subtle">(you)</span>
                     ) : null}
                   </p>
-                  <p className="truncate text-xs text-text-subtle">{m.email}</p>
+                  {/* A guest's address is synthetic and unroutable — showing it
+                      would be noise pretending to be contact information. */}
+                  <p className="truncate text-xs text-text-subtle">
+                    {m.isGuest ? "Joined with a share link" : m.email}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {canChangeRole ? (
                     <>
                       <label htmlFor={`role-${m.userId}`} className="sr-only">
-                        Change {m.email}&rsquo;s role
+                        {/* Name, not email — a guest's address is a synthetic
+                            uuid string, and reading that aloud helps nobody. */}
+                        Change {m.name || m.email}&rsquo;s role
                       </label>
                       <Select
                         id={`role-${m.userId}`}

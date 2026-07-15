@@ -95,6 +95,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       userId: target.id,
       email: target.email,
       name: target.name,
+      isGuest: target.isGuest,
       role: parsed.data.role,
     },
   });
