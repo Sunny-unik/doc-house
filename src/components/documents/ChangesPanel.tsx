@@ -231,11 +231,18 @@ export function ChangesPanel({
           // pushed the rest of the page off the bottom. tabIndex makes the
           // region scrollable by keyboard — without it the overflow is
           // reachable by mouse and touch only.
+          //
+          // `relative` is load-bearing. The rows carry sr-only labels, which are
+          // position:absolute, and overflow only clips an absolutely-positioned
+          // element when the scroller is also its containing block. Without it
+          // they escape the cap, keep their full in-flow offset, and push the
+          // *document* scroll area down to meet them — leaving dead space under
+          // the footer that no visible element accounts for.
           <div
             role="group"
             aria-labelledby="synced-heading"
             tabIndex={0}
-            className="scroll-region mt-3 max-h-80 overflow-y-auto rounded-xl border border-line px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="scroll-region relative mt-3 max-h-80 overflow-y-auto rounded-xl border border-line px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ul className="divide-y divide-line">
               {entries.map((entry) => (
