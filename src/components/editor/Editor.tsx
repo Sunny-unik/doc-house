@@ -88,7 +88,11 @@ export function Editor({
     <div className="mt-5">
       {editable && editor ? <Toolbar editor={editor} /> : null}
 
-      <div className="mt-3 rounded-xl border border-line bg-surface px-5 py-4">
+      {/* Caps the writing surface so a long document scrolls inside the box
+          instead of stretching the whole page. min-height (20rem, in editor.css)
+          still lets it grow first; the cap only bites past that. scroll-region
+          themes the scrollbar to match the rest of the app. */}
+      <div className="scroll-region mt-3 max-h-[60vh] overflow-y-auto rounded-xl border border-line bg-surface px-5 py-4">
         <EditorContent editor={editor} />
       </div>
 
