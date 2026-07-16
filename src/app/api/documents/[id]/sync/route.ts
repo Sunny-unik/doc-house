@@ -6,7 +6,7 @@ import { parseJsonBody } from "@/lib/security/payload";
 import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
 import { SyncRequestSchema } from "@/lib/sync/protocol";
-import { bytesEqual, materializeDoc } from "@/lib/sync/yjs-server";
+import { materializeDoc } from "@/lib/sync/yjs-server";
 
 // POST /api/documents/[id]/sync
 // One round-trip that both pushes the client's changes and pulls the server's:
@@ -70,7 +70,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const serverDoc = materializeDoc(rows.map((row) => row.update));
 
   try {
-    const before = Y.encodeStateVector(serverDoc);
+    const beforeVector = Y.encodeStateVector(serverDoc);
+    const beforeSnapshot = Y.snapshot(serverDoc);
     try {
       // Yjs throws on malformed binary. Convert that into a 400 so a bad actor
       // can't force the route into a 500 path.
@@ -78,10 +79,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     } catch {
       return Response.json({ error: "Malformed Yjs update" }, { status: 400 });
     }
-    const after = Y.encodeStateVector(serverDoc);
 
-    if (!bytesEqual(before, after)) {
-      const contribution = Y.encodeStateAsUpdate(serverDoc, before);
+    // Compare snapshots, not state vectors. A deletion creates no new structs,
+    // so the author's clock never advances and the vector comes back identical
+    // — meaning a pure delete looks like "nothing changed", never gets appended,
+    // and reappears the moment the doc is rebuilt from the log. A snapshot
+    // carries the delete set alongside the vector, so it sees removals too.
+    if (!Y.equalSnapshots(beforeSnapshot, Y.snapshot(serverDoc))) {
+      const contribution = Y.encodeStateAsUpdate(serverDoc, beforeVector);
       await appendDocumentUpdate(id, contribution, session.user.id);
     }
 
