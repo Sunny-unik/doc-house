@@ -11,6 +11,7 @@ export function Toolbar({ editor }: { editor: Editor }) {
     selector: ({ editor }) => ({
       bold: editor.isActive("bold"),
       italic: editor.isActive("italic"),
+      strike: editor.isActive("strike"),
       h1: editor.isActive("heading", { level: 1 }),
       h2: editor.isActive("heading", { level: 2 }),
       bullet: editor.isActive("bulletList"),
@@ -23,6 +24,7 @@ export function Toolbar({ editor }: { editor: Editor }) {
   const buttons = [
     { label: "Bold", hint: "Bold (Ctrl+B)", on: state.bold, run: () => editor.chain().focus().toggleBold().run() },
     { label: "Italic", hint: "Italic (Ctrl+I)", on: state.italic, run: () => editor.chain().focus().toggleItalic().run() },
+    { label: "Strike", hint: "Strikethrough (Ctrl+Shift+S)", on: state.strike, run: () => editor.chain().focus().toggleStrike().run() },
     { divider: true },
     { label: "H1", hint: "Heading 1", on: state.h1, run: () => editor.chain().focus().toggleHeading({ level: 1 }).run() },
     { label: "H2", hint: "Heading 2", on: state.h2, run: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
