@@ -14,6 +14,7 @@ export function DocumentEditor(props: {
   documentId: string;
   editable: boolean;
   isOwner: boolean;
+  currentUserId: string;
   membersPanel: React.ReactNode;
 }) {
   return <Editor {...props} />;

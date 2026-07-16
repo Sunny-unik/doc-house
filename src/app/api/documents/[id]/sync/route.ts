@@ -2,6 +2,7 @@ import * as Y from "yjs";
 import { auth } from "@/auth";
 import { appendDocumentUpdate, getDocumentUpdates } from "@/db/dal/updates";
 import { requireDocRole } from "@/lib/authz";
+import { listPresent, markPresent } from "@/lib/presence";
 import { parseJsonBody } from "@/lib/security/payload";
 import { rateLimit, tooManyRequestsResponse } from "@/lib/security/rate-limit";
 import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
@@ -90,8 +91,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await appendDocumentUpdate(id, contribution, session.user.id);
     }
 
+    markPresent(id, {
+      userId: session.user.id,
+      name: session.user.name ?? session.user.email ?? "Someone",
+      isGuest: session.user.isGuest,
+    });
+
     const diff = Y.encodeStateAsUpdate(serverDoc, clientStateVector);
-    return Response.json({ update: bytesToBase64(diff) });
+    return Response.json({
+      update: bytesToBase64(diff),
+      presence: listPresent(id),
+    });
   } finally {
     serverDoc.destroy();
   }

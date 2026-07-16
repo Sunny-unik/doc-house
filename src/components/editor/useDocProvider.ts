@@ -7,12 +7,18 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { localDocKey } from "@/lib/collab";
 import { clearSyncState, getSyncState, putSyncState } from "@/lib/offline/sync-state";
 import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
+import type { PresenceUser } from "@/lib/sync/protocol";
 
 export type SyncStatus = "synced" | "syncing" | "offline" | "error";
 
 // The server's state for this document as of our last successful sync, plus
 // when that was. Everything in the live Y.Doc beyond `baseline` is pending.
 export type SyncedBaseline = { baseline: Uint8Array; syncedAt: number };
+
+// How often the background poll runs. Collaboration is close-to-live rather than
+// instant: on serverless we can't hold a socket, so this trades a couple of
+// seconds of latency for a design that costs nothing to keep open.
+const POLL_MS = 2500;
 
 // The server returns 403 when the caller has been downgraded to viewer, or 404
 // when they've been removed entirely. We treat both as a signal that the local
@@ -43,13 +49,15 @@ async function discardAndReset(
   }
 }
 
-// Owns the document's Y.Doc, its local IndexedDB persistence, and the automatic
-// server sync. Sync is triggered by: initial load, each local edit (debounced),
-// and coming back online. No constant polling — so it's "auto-sync", not realtime.
+// Owns the document's Y.Doc, its local IndexedDB persistence, and server sync.
+// Sync fires on: initial load, each local edit (debounced), reconnect, and a
+// steady background poll so you see collaborators' edits and they see yours.
+// Editors push-and-pull; viewers only ever pull.
 export function useDocProvider(documentId: string, editable: boolean) {
   const [ydoc] = useState(() => new Y.Doc());
   const [loaded, setLoaded] = useState(false);
   const [synced, setSynced] = useState<SyncedBaseline | null>(null);
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [status, setStatus] = useState<SyncStatus>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "synced",
   );
@@ -67,8 +75,10 @@ export function useDocProvider(documentId: string, editable: boolean) {
 
     let cancelled = false;
     let debounce: ReturnType<typeof setTimeout> | null = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
     let syncing = false;
     let rerun = false;
+    let pulling = false;
 
     // Last known server state, restored from a previous session. Until the
     // first sync of this session lands, this is the only thing that can tell
@@ -84,7 +94,28 @@ export function useDocProvider(documentId: string, editable: boolean) {
       }
     })();
 
-    async function sync() {
+    // Downgraded to viewer (403) or removed (404) mid-session. Shared by both
+    // the push and pull paths since either can be the first to hear about it.
+    async function handleAccessLoss(kind: 403 | 404) {
+      cancelled = true;
+      // Acknowledge-only, and deliberately blocking: the reset reloads the
+      // page, so anything non-blocking would vanish before it was read.
+      await confirmRef.current({
+        title: "Your access to this document changed",
+        body:
+          kind === 404
+            ? "You no longer have access. Any edits made since then can't be saved and will be discarded."
+            : "You're now a viewer. Any edits made since the change can't be saved and will be discarded.",
+        confirmLabel: "Continue",
+        hideCancel: true,
+      });
+      await discardAndReset(documentId, persistence, kind === 404 ? "/app" : null);
+    }
+
+    // Editor path: push local changes and pull the server's in one round-trip.
+    // `background` is the periodic poll — it stays quiet (no "Syncing…" flash)
+    // so an idle document doesn't blink its status every couple of seconds.
+    async function sync(background = false) {
       if (cancelled || !editable) return;
       if (!navigator.onLine) {
         setStatus("offline");
@@ -96,7 +127,7 @@ export function useDocProvider(documentId: string, editable: boolean) {
         return;
       }
       syncing = true;
-      setStatus("syncing");
+      if (!background) setStatus("syncing");
       try {
         // Snapshot both halves of the payload together, before the round-trip.
         // The pushed bytes are what the baseline is rebuilt from below, so they
@@ -114,30 +145,15 @@ export function useDocProvider(documentId: string, editable: boolean) {
           }),
         });
         if (res.status === 403 || res.status === 404) {
-          // Role revoked or membership dropped mid-session. Stop accepting
-          // further edits, wipe the polluted local store, and reload from the
-          // server's canonical state. 404 also means we've lost access
-          // entirely — bounce back to the doc list.
-          cancelled = true;
-          // Acknowledge-only, and deliberately blocking: the reset reloads the
-          // page, so anything non-blocking would vanish before it was read.
-          await confirmRef.current({
-            title: "Your access to this document changed",
-            body:
-              res.status === 404
-                ? "You no longer have access. Any edits made since then can't be saved and will be discarded."
-                : "You're now a viewer. Any edits made since the change can't be saved and will be discarded.",
-            confirmLabel: "Continue",
-            hideCancel: true,
-          });
-          await discardAndReset(documentId, persistence, res.status === 404 ? "/app" : null);
+          await handleAccessLoss(res.status);
           return;
         }
         if (!res.ok) throw new Error(String(res.status));
-        const data: { update: string } = await res.json();
+        const data: { update: string; presence?: PresenceUser[] } = await res.json();
         const serverDiff = base64ToBytes(data.update);
         // Origin "remote" so applying the server's diff doesn't re-trigger a push.
         Y.applyUpdate(ydoc, serverDiff, "remote");
+        if (data.presence && !cancelled) setPresence(data.presence);
 
         // The server accepted `pushed` and answered with everything we were
         // missing, so those two merged *are* the server's state — no guessing,
@@ -164,6 +180,60 @@ export function useDocProvider(documentId: string, editable: boolean) {
       }
     }
 
+    // Viewer path: pull the server's changes, push nothing. A viewer never has
+    // local edits, so after applying there's nothing "pending" to track — this
+    // stays deliberately lighter than sync() and skips the baseline bookkeeping.
+    async function pullOnly() {
+      if (cancelled || editable) return;
+      if (!navigator.onLine) {
+        setStatus("offline");
+        return;
+      }
+      if (pulling) return;
+      pulling = true;
+      try {
+        const res = await fetch(`/api/documents/${documentId}/pull`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stateVector: bytesToBase64(Y.encodeStateVector(ydoc)) }),
+        });
+        if (res.status === 403 || res.status === 404) {
+          await handleAccessLoss(res.status);
+          return;
+        }
+        if (!res.ok) throw new Error(String(res.status));
+        const data: { update: string; presence?: PresenceUser[] } = await res.json();
+        Y.applyUpdate(ydoc, base64ToBytes(data.update), "remote");
+        if (data.presence && !cancelled) setPresence(data.presence);
+        if (!cancelled) setStatus("synced");
+      } catch {
+        if (!cancelled) setStatus(navigator.onLine ? "error" : "offline");
+      } finally {
+        pulling = false;
+      }
+    }
+
+    // One tick of the background loop: refresh unless the tab is hidden (no one
+    // is watching) or we're offline (nothing to reach).
+    function refresh(background = true) {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (!navigator.onLine) return;
+      if (editable) void sync(background);
+      else void pullOnly();
+    }
+
+    function startPolling() {
+      if (poll) return;
+      poll = setInterval(() => refresh(true), POLL_MS);
+    }
+    function stopPolling() {
+      if (poll) {
+        clearInterval(poll);
+        poll = null;
+      }
+    }
+
     function scheduleSync() {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => void sync(), 1200);
@@ -177,28 +247,43 @@ export function useDocProvider(documentId: string, editable: boolean) {
     }
     ydoc.on("update", onUpdate);
 
-    // Once local data has loaded, do the first sync (pushes offline edits, pulls server).
+    // Once local data has loaded, do the first sync (pushes offline edits, pulls
+    // server) and start the background loop.
     const onSynced = () => {
       setLoaded(true);
-      void sync();
+      refresh(false);
+      if (typeof document === "undefined" || !document.hidden) startPolling();
     };
     persistence.on("synced", onSynced);
 
-    const onOnline = () => void sync();
+    // Coming back online, or returning to the tab, both want an immediate
+    // refresh — and the tab returning also restarts the loop we paused on hide.
+    const onOnline = () => refresh(false);
     const onOffline = () => setStatus("offline");
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        refresh(false);
+        startPolling();
+      }
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelled = true;
       if (debounce) clearTimeout(debounce);
+      stopPolling();
       ydoc.off("update", onUpdate);
       persistence.off("synced", onSynced);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      document.removeEventListener("visibilitychange", onVisibility);
       void persistence.destroy();
     };
   }, [ydoc, documentId, editable]);
 
-  return { ydoc, loaded, status, synced };
+  return { ydoc, loaded, status, synced, presence };
 }

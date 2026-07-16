@@ -10,6 +10,7 @@ import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel"
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { YJS_FRAGMENT } from "@/lib/collab";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { PresenceStrip } from "./PresenceStrip";
 import { Toolbar } from "./Toolbar";
 import { useDocProvider } from "./useDocProvider";
 import "./editor.css";
@@ -18,17 +19,21 @@ export function Editor({
   documentId,
   editable,
   isOwner,
+  currentUserId,
   membersPanel,
 }: {
   documentId: string;
   editable: boolean;
   isOwner: boolean;
+  // The viewer's own id, used only to label their own avatar as "you" in the
+  // presence strip. Everything authorization-related still comes from the server.
+  currentUserId: string;
   // Rendered by the server component (it needs the member list and session), then
   // handed down so it can live alongside the panels that depend on the Y.Doc.
   membersPanel: React.ReactNode;
 }) {
   // The provider owns the Y.Doc, local persistence, and automatic server sync.
-  const { ydoc, loaded, status, synced } = useDocProvider(documentId, editable);
+  const { ydoc, loaded, status, synced, presence } = useDocProvider(documentId, editable);
 
   const editor = useEditor({
     editable,
@@ -96,9 +101,12 @@ export function Editor({
         <EditorContent editor={editor} />
       </div>
 
-      <div className="mt-2.5 flex items-center gap-3 px-1 text-xs text-text-subtle">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 px-1 text-xs text-text-subtle">
         {editable ? <ConnectionStatus status={status} /> : null}
         <span>{loaded ? "Saved locally" : "Loading…"}</span>
+        <div className="ml-auto">
+          <PresenceStrip users={presence} selfId={currentUserId} />
+        </div>
       </div>
 
       <div className="mt-10">

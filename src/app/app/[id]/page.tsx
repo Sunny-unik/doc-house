@@ -45,6 +45,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         documentId={doc.id}
         editable={doc.role !== "viewer"}
         isOwner={doc.role === "owner"}
+        currentUserId={session.user.id}
         membersPanel={
           <MembersPanel
             documentId={doc.id}

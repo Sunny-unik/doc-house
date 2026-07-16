@@ -18,5 +18,24 @@ export const SyncRequestSchema = z.object({
 
 export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 
-// The server returns the update the client is missing (base64).
-export type SyncResponse = { update: string };
+// A viewer (or a background poll) pulling the server's changes without pushing
+// any of its own — just the state vector, so the server can answer with a diff.
+export const PullRequestSchema = z.object({
+  stateVector: z.string().max(MAX_BASE64),
+});
+
+export type PullRequest = z.infer<typeof PullRequestSchema>;
+
+// One collaborator currently in the document. Defined here (client-safe) so both
+// the API and the UI can share it without pulling in the server-only store.
+export type PresenceUser = {
+  userId: string;
+  name: string;
+  isGuest: boolean;
+  color: string;
+};
+
+// Both endpoints return the update the client is missing (base64) plus who else
+// is here right now.
+export type SyncResponse = { update: string; presence: PresenceUser[] };
+export type PullResponse = SyncResponse;
