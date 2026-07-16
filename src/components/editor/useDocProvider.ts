@@ -5,15 +5,21 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { localDocKey } from "@/lib/collab";
+import { clearSyncState, getSyncState, putSyncState } from "@/lib/offline/sync-state";
 import { base64ToBytes, bytesToBase64 } from "@/lib/sync/codec";
 
 export type SyncStatus = "synced" | "syncing" | "offline" | "error";
+
+// The server's state for this document as of our last successful sync, plus
+// when that was. Everything in the live Y.Doc beyond `baseline` is pending.
+export type SyncedBaseline = { baseline: Uint8Array; syncedAt: number };
 
 // The server returns 403 when the caller has been downgraded to viewer, or 404
 // when they've been removed entirely. We treat both as a signal that the local
 // Y.Doc is now polluted with edits the server never accepted — the only safe
 // remedy is to discard local state and restart from the server's truth.
 async function discardAndReset(
+  documentId: string,
   persistence: IndexeddbPersistence,
   redirectTo: string | null,
 ) {
@@ -21,6 +27,13 @@ async function discardAndReset(
     await persistence.clearData();
   } catch {
     /* store already gone or blocked — the reload will still recover */
+  }
+  try {
+    // The baseline describes a local doc that no longer exists. Leaving it
+    // would make the next load diff against a document we just threw away.
+    await clearSyncState(documentId);
+  } catch {
+    /* same — a stale baseline is corrected by the next successful sync */
   }
   if (typeof window === "undefined") return;
   if (redirectTo) {
@@ -36,6 +49,7 @@ async function discardAndReset(
 export function useDocProvider(documentId: string, editable: boolean) {
   const [ydoc] = useState(() => new Y.Doc());
   const [loaded, setLoaded] = useState(false);
+  const [synced, setSynced] = useState<SyncedBaseline | null>(null);
   const [status, setStatus] = useState<SyncStatus>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "synced",
   );
@@ -56,6 +70,20 @@ export function useDocProvider(documentId: string, editable: boolean) {
     let syncing = false;
     let rerun = false;
 
+    // Last known server state, restored from a previous session. Until the
+    // first sync of this session lands, this is the only thing that can tell
+    // an offline reader what's still unpushed.
+    void (async () => {
+      try {
+        const stored = await getSyncState(documentId);
+        if (stored && !cancelled) {
+          setSynced({ baseline: stored.baseline, syncedAt: stored.syncedAt });
+        }
+      } catch {
+        /* no baseline yet — the first successful sync writes one */
+      }
+    })();
+
     async function sync() {
       if (cancelled || !editable) return;
       if (!navigator.onLine) {
@@ -70,12 +98,19 @@ export function useDocProvider(documentId: string, editable: boolean) {
       syncing = true;
       setStatus("syncing");
       try {
+        // Snapshot both halves of the payload together, before the round-trip.
+        // The pushed bytes are what the baseline is rebuilt from below, so they
+        // have to be the exact bytes the server saw — not "whatever the doc
+        // holds by the time the response lands".
+        const pushed = Y.encodeStateAsUpdate(ydoc);
+        const stateVector = Y.encodeStateVector(ydoc);
+
         const res = await fetch(`/api/documents/${documentId}/sync`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            update: bytesToBase64(Y.encodeStateAsUpdate(ydoc)),
-            stateVector: bytesToBase64(Y.encodeStateVector(ydoc)),
+            update: bytesToBase64(pushed),
+            stateVector: bytesToBase64(stateVector),
           }),
         });
         if (res.status === 403 || res.status === 404) {
@@ -95,13 +130,28 @@ export function useDocProvider(documentId: string, editable: boolean) {
             confirmLabel: "Continue",
             hideCancel: true,
           });
-          await discardAndReset(persistence, res.status === 404 ? "/app" : null);
+          await discardAndReset(documentId, persistence, res.status === 404 ? "/app" : null);
           return;
         }
         if (!res.ok) throw new Error(String(res.status));
         const data: { update: string } = await res.json();
+        const serverDiff = base64ToBytes(data.update);
         // Origin "remote" so applying the server's diff doesn't re-trigger a push.
-        Y.applyUpdate(ydoc, base64ToBytes(data.update), "remote");
+        Y.applyUpdate(ydoc, serverDiff, "remote");
+
+        // The server accepted `pushed` and answered with everything we were
+        // missing, so those two merged *are* the server's state — no guessing,
+        // and no extra request to go ask for it. Anything the doc has picked up
+        // beyond this point (including edits typed during the round-trip) is
+        // correctly left out, and shows up as pending.
+        const baseline = Y.mergeUpdates([pushed, serverDiff]);
+        const syncedAt = Date.now();
+        if (!cancelled) setSynced({ baseline, syncedAt });
+        // Persisted so a reader who reloads offline still knows what's unpushed.
+        void putSyncState(documentId, baseline, syncedAt).catch(() => {
+          /* the next successful sync rewrites it */
+        });
+
         if (!cancelled) setStatus("synced");
       } catch {
         if (!cancelled) setStatus(navigator.onLine ? "error" : "offline");
@@ -150,5 +200,5 @@ export function useDocProvider(documentId: string, editable: boolean) {
     };
   }, [ydoc, documentId, editable]);
 
-  return { ydoc, loaded, status };
+  return { ydoc, loaded, status, synced };
 }

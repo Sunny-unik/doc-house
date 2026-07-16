@@ -8,6 +8,12 @@
  * components — the token flips, the markup doesn't.
  */
 :root {
+  /* Tells the browser which way the page leans so it renders its *own* UI to
+   * match — scrollbars, form controls, autofill. Without it the whole native
+   * layer stays light on a dark page, and no amount of token styling reaches
+   * it: those parts aren't ours to paint. */
+  color-scheme: light;
+
   --canvas: #fafafa;
   --surface: #ffffff;
   --surface-muted: #f4f4f5;
@@ -35,6 +41,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
+
     --canvas: #09090b;
     --surface: #101013;
     --surface-muted: #1b1b1f;
@@ -103,6 +111,18 @@ body {
   ::before {
     border-color: var(--line);
   }
+}
+
+/* Scrollable panels inside the app (the synced history list, for one). Reads
+ * from the same tokens as everything else, so it flips with the theme like the
+ * rest of the UI rather than needing a second set of colours.
+ *
+ * `color-scheme` above already gets these close on its own; this pins the thumb
+ * to our own line colour instead of the browser's grey, and drops the track so
+ * the strip doesn't cut a visible channel down the side of a panel. */
+.scroll-region {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 /* Respect users who ask the OS to tone motion down. */

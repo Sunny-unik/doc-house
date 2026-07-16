@@ -4,6 +4,7 @@ import Collaboration from "@tiptap/extension-collaboration";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { AIAssistant } from "@/components/documents/AIAssistant";
+import { ChangesPanel } from "@/components/documents/ChangesPanel";
 import { ShareLinksPanel } from "@/components/documents/ShareLinksPanel";
 import { VersionHistoryPanel } from "@/components/documents/VersionHistoryPanel";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
@@ -27,7 +28,7 @@ export function Editor({
   membersPanel: React.ReactNode;
 }) {
   // The provider owns the Y.Doc, local persistence, and automatic server sync.
-  const { ydoc, loaded, status } = useDocProvider(documentId, editable);
+  const { ydoc, loaded, status, synced } = useDocProvider(documentId, editable);
 
   const editor = useEditor({
     editable,
@@ -45,8 +46,18 @@ export function Editor({
   const tabs: TabItem[] = [
     {
       id: "assistant",
-      label: "Assistant",
-      content: <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />,
+      label: "Summarizer",
+      content: (
+        <div>
+          <AIAssistant documentId={documentId} editor={editor} canEdit={editable} />
+          <ChangesPanel
+            documentId={documentId}
+            ydoc={ydoc}
+            synced={synced}
+            canEdit={editable}
+          />
+        </div>
+      ),
     },
     {
       id: "history",
