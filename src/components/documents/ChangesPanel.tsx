@@ -45,6 +45,7 @@ export function ChangesPanel({
   documentId,
   ydoc,
   synced,
+  lastContactAt,
   canEdit,
 }: {
   documentId: string;
@@ -52,6 +53,10 @@ export function ChangesPanel({
   // Null until the first sync of this session lands and no baseline was stored
   // by a previous one — i.e. we genuinely don't know what the server has yet.
   synced: SyncedBaseline | null;
+  // When we last reached the server, updated on every poll. Drives "last synced"
+  // so it reads "just now" while live and climbs only when contact actually drops
+  // — unlike synced.syncedAt, which moves only on a real content change.
+  lastContactAt: number | null;
   canEdit: boolean;
 }) {
   const { toast } = useToast();
@@ -203,10 +208,10 @@ export function ChangesPanel({
           ) : (
             <p className="mt-3 text-sm text-text-muted">
               Everything you&apos;ve written is on the server
-              {synced.syncedAt ? (
+              {lastContactAt ? (
                 <>
                   {" — last synced "}
-                  <TimeAgo iso={new Date(synced.syncedAt).toISOString()} />
+                  <TimeAgo iso={new Date(lastContactAt).toISOString()} />
                 </>
               ) : null}
               .

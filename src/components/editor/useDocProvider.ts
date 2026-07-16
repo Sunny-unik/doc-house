@@ -15,6 +15,12 @@ export type SyncStatus = "synced" | "syncing" | "offline" | "error";
 // when that was. Everything in the live Y.Doc beyond `baseline` is pending.
 export type SyncedBaseline = { baseline: Uint8Array; syncedAt: number };
 
+function sameBytes(a: Uint8Array | null, b: Uint8Array): boolean {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 // How often the background poll runs. Collaboration is close-to-live rather than
 // instant: on serverless we can't hold a socket, so this trades a couple of
 // seconds of latency for a design that costs nothing to keep open.
@@ -58,6 +64,12 @@ export function useDocProvider(documentId: string, editable: boolean) {
   const [loaded, setLoaded] = useState(false);
   const [synced, setSynced] = useState<SyncedBaseline | null>(null);
   const [presence, setPresence] = useState<PresenceUser[]>([]);
+  // When we last reached the server successfully — bumped on every poll, not
+  // just when content changed. Distinct from `synced.syncedAt` (which only moves
+  // on a real change, so it can drive the history refetch without thrashing).
+  // This is what "last synced" reads from: it says "just now" while we're live
+  // and starts climbing the moment contact drops.
+  const [lastContactAt, setLastContactAt] = useState<number | null>(null);
   const [status, setStatus] = useState<SyncStatus>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "synced",
   );
@@ -79,6 +91,11 @@ export function useDocProvider(documentId: string, editable: boolean) {
     let syncing = false;
     let rerun = false;
     let pulling = false;
+    // The server state we last told React about. The background poll runs every
+    // couple of seconds and almost always finds nothing new; comparing against
+    // this lets a no-op sync stay silent instead of bumping `synced` — which
+    // would otherwise make the Changes panel refetch its history every tick.
+    let lastBaseline: Uint8Array | null = null;
 
     // Last known server state, restored from a previous session. Until the
     // first sync of this session lands, this is the only thing that can tell
@@ -161,14 +178,23 @@ export function useDocProvider(documentId: string, editable: boolean) {
         // beyond this point (including edits typed during the round-trip) is
         // correctly left out, and shows up as pending.
         const baseline = Y.mergeUpdates([pushed, serverDiff]);
-        const syncedAt = Date.now();
-        if (!cancelled) setSynced({ baseline, syncedAt });
-        // Persisted so a reader who reloads offline still knows what's unpushed.
-        void putSyncState(documentId, baseline, syncedAt).catch(() => {
-          /* the next successful sync rewrites it */
-        });
+        // Only surface a new baseline when it genuinely differs — otherwise an
+        // idle document would re-render and refetch on every poll. mergeUpdates
+        // is deterministic, so identical state gives identical bytes.
+        if (!cancelled && !sameBytes(lastBaseline, baseline)) {
+          lastBaseline = baseline;
+          const syncedAt = Date.now();
+          setSynced({ baseline, syncedAt });
+          // Persisted so a reader who reloads offline still knows what's unpushed.
+          void putSyncState(documentId, baseline, syncedAt).catch(() => {
+            /* the next successful sync rewrites it */
+          });
+        }
 
-        if (!cancelled) setStatus("synced");
+        if (!cancelled) {
+          setLastContactAt(Date.now());
+          setStatus("synced");
+        }
       } catch {
         if (!cancelled) setStatus(navigator.onLine ? "error" : "offline");
       } finally {
@@ -205,7 +231,10 @@ export function useDocProvider(documentId: string, editable: boolean) {
         const data: { update: string; presence?: PresenceUser[] } = await res.json();
         Y.applyUpdate(ydoc, base64ToBytes(data.update), "remote");
         if (data.presence && !cancelled) setPresence(data.presence);
-        if (!cancelled) setStatus("synced");
+        if (!cancelled) {
+          setLastContactAt(Date.now());
+          setStatus("synced");
+        }
       } catch {
         if (!cancelled) setStatus(navigator.onLine ? "error" : "offline");
       } finally {
@@ -285,5 +314,5 @@ export function useDocProvider(documentId: string, editable: boolean) {
     };
   }, [ydoc, documentId, editable]);
 
-  return { ydoc, loaded, status, synced, presence };
+  return { ydoc, loaded, status, synced, presence, lastContactAt };
 }

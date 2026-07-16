@@ -33,7 +33,10 @@ export function Editor({
   membersPanel: React.ReactNode;
 }) {
   // The provider owns the Y.Doc, local persistence, and automatic server sync.
-  const { ydoc, loaded, status, synced, presence } = useDocProvider(documentId, editable);
+  const { ydoc, loaded, status, synced, presence, lastContactAt } = useDocProvider(
+    documentId,
+    editable,
+  );
 
   const editor = useEditor({
     editable,
@@ -59,6 +62,7 @@ export function Editor({
             documentId={documentId}
             ydoc={ydoc}
             synced={synced}
+            lastContactAt={lastContactAt}
             canEdit={editable}
           />
         </div>
